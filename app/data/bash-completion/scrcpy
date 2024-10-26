@@ -3,9 +3,11 @@ _scrcpy() {
     local opts="
         --always-on-top
         --audio-bit-rate=
+        --audio-buffer=
         --audio-codec=
         --audio-codec-options=
         --audio-encoder=
+        --audio-output-buffer=
         -b --video-bit-rate=
         --crop=
         -d --select-usb
@@ -115,20 +117,26 @@ _scrcpy() {
             COMPREPLY=($(compgen -W "$("${ADB:-adb}" devices | awk '$2 == "device" {print $1}')" -- ${cur}))
             return
             ;;
-        -b|--video-bit-rate \
-        |--codec-options \
+        --audio-bit-rate \
+        |--audio-buffer \
+        |-b|--video-bit-rate \
+        |--audio-codec-options \
+        |--audio-encoder \
+        |--audio-output-buffer \
         |--crop \
         |--display \
         |--display-buffer \
-        |--encoder \
         |--max-fps \
         |-m|--max-size \
         |-p|--port \
         |--push-target \
+        |--rotation \
         |--tunnel-host \
         |--tunnel-port \
         |--v4l2-buffer \
         |--v4l2-sink \
+        |--video-codec-options \
+        |--video-encoder \
         |--tcpip \
         |--window-*)
             # Option accepting an argument, but nothing to auto-complete

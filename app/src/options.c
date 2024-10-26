@@ -44,6 +44,7 @@ const struct scrcpy_options scrcpy_options_default = {
     .display_buffer = 0,
     .v4l2_buffer = 0,
     .audio_buffer = SC_TICK_FROM_MS(50),
+    .audio_output_buffer = SC_TICK_FROM_MS(5),
 #ifdef HAVE_USB
     .otg = false,
 #endif
@@ -52,6 +53,7 @@ const struct scrcpy_options scrcpy_options_default = {
     .always_on_top = false,
     .control = true,
     .display = true,
+    .vnc_server = false,
     .turn_screen_off = false,
     .key_inject_mode = SC_KEY_INJECT_MODE_MIXED,
     .window_borderless = false,

@@ -14,6 +14,7 @@ src = [
     'src/delay_buffer.c',
     'src/demuxer.c',
     'src/device_msg.c',
+    'src/display.c',
     'src/icon.c',
     'src/file_pusher.c',
     'src/fps_counter.c',
@@ -82,6 +83,11 @@ if v4l2_support
     src += [ 'src/v4l2_sink.c' ]
 endif
 
+vnc_support = get_option('vnc') and host_machine.system() == 'linux'
+if vnc_support
+    src += [ 'src/vnc_sink.c' ]
+endif
+
 usb_support = get_option('usb')
 if usb_support
     src += [
@@ -111,6 +117,10 @@ if not crossbuild_windows
 
     if v4l2_support
         dependencies += dependency('libavdevice')
+    endif
+    if vnc_support
+        dependencies += dependency('libswscale')
+        dependencies += dependency('libvncserver')
     endif
 
     if usb_support
@@ -213,6 +223,9 @@ conf.set('SERVER_DEBUGGER_METHOD_NEW', get_option('server_debugger_method') == '
 # enable V4L2 support (linux only)
 conf.set('HAVE_V4L2', v4l2_support)
 
+# enable libvnc support
+conf.set('HAVE_VNC', vnc_support)
+
 # enable HID over AOA support (linux only)
 conf.set('HAVE_USB', usb_support)
 
@@ -277,10 +290,6 @@ if get_option('buildtype') == 'debug'
             'src/util/strbuf.c',
             'src/util/term.c',
         ]],
-        ['test_clock', [
-            'tests/test_clock.c',
-            'src/clock.c',
-        ]],
         ['test_control_msg_serialize', [
             'tests/test_control_msg_serialize.c',
             'src/control_msg.c',
@@ -310,7 +319,8 @@ if get_option('buildtype') == 'debug'
     ]
 
     foreach t : tests
-        exe = executable(t[0], t[1],
+        sources = t[1] + ['src/compat.c']
+        exe = executable(t[0], sources,
                          include_directories: src_dir,
                          dependencies: dependencies,
                          c_args: ['-DSDL_MAIN_HANDLED', '-DSC_TEST'])
