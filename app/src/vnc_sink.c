@@ -1,9 +1,12 @@
 #include "vnc_sink.h"
+#include <rfb/keysym.h>
 
 #include <string.h>
 
 #include "util/log.h"
 #include "util/str.h"
+#include "input_events.h"
+#include "trait/key_processor.h"
 
 /** Downcast frame_sink to sc_vnc_sink */
 #define DOWNCAST(SINK) container_of(SINK, struct sc_vnc_sink, frame_sink)
@@ -60,7 +63,7 @@ sc_vnc_frame_sink_push(struct sc_frame_sink *sink, const AVFrame *frame) {
 }
 
 bool
-sc_vnc_sink_init(struct sc_vnc_sink *vs, const char *device_name, struct sc_controller *controller) {
+sc_vnc_sink_init(struct sc_vnc_sink *vs, const char *device_name, struct sc_controller *controller, struct sc_key_processor *key_processor) {
     uint8_t placeholder_width = 32;
     uint8_t placeholder_height = 32;
     static const struct sc_frame_sink_ops ops = {
@@ -76,9 +79,12 @@ sc_vnc_sink_init(struct sc_vnc_sink *vs, const char *device_name, struct sc_cont
     vs->screen->alwaysShared = true;
     vs->screen->frameBuffer = (char *)malloc(placeholder_width * placeholder_height * vs->bpp);
     vs->screen->ptrAddEvent = ptr_add_event;
+    vs->screen->kbdAddEvent = kbd_add_event;
+    vs->mods_state = 0;
     vs->screen->screenData = vs;
     vs->was_down = false;
     vs->controller = controller;
+    vs->key_processor = key_processor;
     rfbInitServer(vs->screen);
     rfbRunEventLoop(vs->screen, -1, true); // TODO: integrate into proper lifecycle
     return true;
@@ -129,4 +135,60 @@ ptr_add_event(int buttonMask, int x, int y, rfbClientPtr cl) {
 
     rfbDefaultPtrAddEvent(buttonMask, x, y, cl);
     vnc->was_down = !up;
+}
+
+void kbd_add_event(rfbBool down, rfbKeySym key, rfbClientPtr cl) {
+    struct sc_vnc_sink *vs = (struct sc_vnc_sink *)cl->screen->screenData;
+    
+    if (!vs->key_processor) {
+        LOGD("No key processor available");
+        return;
+    }
+
+    LOGD("VNC key event - key: 0x%x, down: %d", (unsigned int)key, down);
+    LOGD("Current mods_state before: 0x%x", vs->mods_state);
+
+    
+    // Track modifier state
+    uint16_t mod = 0;
+    switch (key) {
+        case XK_Shift_L:
+            LOGD("Left Shift detected");
+            if (down) {
+                vs->mods_state |= (SC_MOD_LSHIFT | 0x1000);  // Add the additional flags
+            } else {
+                vs->mods_state &= ~(SC_MOD_LSHIFT | 0x1000);
+            }
+            break;
+        case XK_Shift_R:
+            if (down) {
+                vs->mods_state |= (SC_MOD_RSHIFT | 0x1000);
+            } else {
+                vs->mods_state &= ~(SC_MOD_RSHIFT | 0x1000);
+            }
+            break;
+    }
+
+    // Convert keys
+    enum sc_keycode keycode;
+    if (key == XK_BackSpace) {
+        keycode = SC_KEYCODE_BACKSPACE;
+    } else if (key >= 'A' && key <= 'Z') {
+        keycode = key + ('a' - 'A');  // Convert to lowercase
+    } else {
+        keycode = key;
+    }
+
+
+    struct sc_key_event event = {
+        .action = down ? SC_ACTION_DOWN : SC_ACTION_UP,
+        .keycode = keycode,
+        .mods_state = vs->mods_state,
+        .repeat = 0
+    };
+
+    LOGD("Sending key event - keycode: 0x%x, action: %d, mods_state: 0x%x",
+         keycode, event.action, event.mods_state);
+
+    vs->key_processor->ops->process_key(vs->key_processor, &event, 0);
 }

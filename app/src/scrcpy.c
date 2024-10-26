@@ -705,7 +705,7 @@ aoa_hid_end:
     }
 #ifdef HAVE_VNC
     if (options->vnc_server) {
-        if (!sc_vnc_sink_init(&s->vnc_sink, "my vnc server", controller)) {
+        if (!sc_vnc_sink_init(&s->vnc_sink, "my vnc server", controller, kp)) {
             printf("bad vnc init \n");
             goto end;
         }

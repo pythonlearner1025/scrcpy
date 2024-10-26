@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "vnc_sink.h": "c",
+        "key_processor.h": "c"
+    }
+}
