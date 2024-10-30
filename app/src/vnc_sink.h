@@ -35,7 +35,8 @@ bool sc_vnc_sink_init(
     struct sc_vnc_sink *vs, 
     const char *device_name, 
     struct sc_controller *controller,
-    struct sc_key_processor *key_processor
+    struct sc_key_processor *key_processor,
+    uint16_t port
 );
 
 void sc_vnc_sink_destroy(struct sc_vnc_sink *vs);

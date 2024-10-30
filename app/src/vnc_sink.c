@@ -63,7 +63,7 @@ sc_vnc_frame_sink_push(struct sc_frame_sink *sink, const AVFrame *frame) {
 }
 
 bool
-sc_vnc_sink_init(struct sc_vnc_sink *vs, const char *device_name, struct sc_controller *controller, struct sc_key_processor *key_processor) {
+sc_vnc_sink_init(struct sc_vnc_sink *vs, const char *device_name, struct sc_controller *controller, struct sc_key_processor *key_processor, uint16_t port) {
     uint8_t placeholder_width = 32;
     uint8_t placeholder_height = 32;
     static const struct sc_frame_sink_ops ops = {
@@ -85,6 +85,8 @@ sc_vnc_sink_init(struct sc_vnc_sink *vs, const char *device_name, struct sc_cont
     vs->was_down = false;
     vs->controller = controller;
     vs->key_processor = key_processor;
+    vs->screen->port = port;
+    vs->screen->ipv6port = port;
     rfbInitServer(vs->screen);
     rfbRunEventLoop(vs->screen, -1, true); // TODO: integrate into proper lifecycle
     return true;
@@ -147,8 +149,6 @@ void kbd_add_event(rfbBool down, rfbKeySym key, rfbClientPtr cl) {
 
     LOGD("VNC key event - key: 0x%x, down: %d", (unsigned int)key, down);
     LOGD("Current mods_state before: 0x%x", vs->mods_state);
-
-    
     // Track modifier state
     uint16_t mod = 0;
     switch (key) {
@@ -169,16 +169,44 @@ void kbd_add_event(rfbBool down, rfbKeySym key, rfbClientPtr cl) {
             break;
     }
 
-    // Convert keys
     enum sc_keycode keycode;
-    if (key == XK_BackSpace) {
-        keycode = SC_KEYCODE_BACKSPACE;
-    } else if (key >= 'A' && key <= 'Z') {
-        keycode = key + ('a' - 'A');  // Convert to lowercase
-    } else {
-        keycode = key;
+    switch (key) {
+        case XK_BackSpace:
+            keycode = SC_KEYCODE_BACKSPACE;
+            break;
+        case '_':
+            keycode = '-';
+            break;
+        case '?':
+            keycode = '/';
+            break;
+        case '>':
+            keycode = '.';
+            break;
+        case '<':
+            keycode = ',';
+            break;
+        case '~':
+            keycode = '`';
+            break;
+        case '|':
+            keycode = '\\';
+        case '"':
+            keycode = '\'';
+            break;
+        case ':':
+            keycode = ';';
+            break;
+        default:
+            if (key >= 'A' && key <= 'Z') {
+                keycode = key + ('a' - 'A');  // Convert to lowercase
+            } else if (key >= 0x21 && key <= 0x29) {
+                keycode = key + 16; // Convert to 1-9 numbers
+            } else {
+                keycode = key;
+            }
+            break;
     }
-
 
     struct sc_key_event event = {
         .action = down ? SC_ACTION_DOWN : SC_ACTION_UP,
@@ -192,3 +220,92 @@ void kbd_add_event(rfbBool down, rfbKeySym key, rfbClientPtr cl) {
 
     vs->key_processor->ops->process_key(vs->key_processor, &event, 0);
 }
+
+/*
+    2
+    DEBUG: VNC key event - key: 0x32, down: 1
+    DEBUG: Current mods_state before: 0x0
+    DEBUG: Sending key event - keycode: 0x32, action: 0, mods_state: 0x0
+    DEBUG: convert_input_key: action=0x0, mods_state=0x0, keycode=0x32, repeat=0
+
+    2+LShift
+    DEBUG: VNC key event - key: 0x40, down: 1
+    DEBUG: Current mods_state before: 0x1001
+    DEBUG: Sending key event - keycode: 0x40, action: 0, mods_state: 0x1001
+    DEBUG: convert_input_key: action=0x0, mods_state=0x1001, keycode=0x40, repeat=0
+    DEBUG: VNC key event - key: 0x40, down: 0
+
+    # sharp in vnc
+
+# Lshift down
+DEBUG: VNC key event - key: 0xffe1, down: 1
+DEBUG: Current mods_state before: 0x0
+DEBUG: Left Shift detected
+DEBUG: Sending key event - keycode: 0xffe1, action: 0, mods_state: 0x1001
+DEBUG: convert_input_key: action=0x0, mods_state=0x1001, keycode=0xffe1, repeat=0
+
+
+# 3 down
+DEBUG: VNC key event - key: 0x23, down: 1
+DEBUG: Current mods_state before: 0x1001
+DEBUG: Sending key event - keycode: 0x23, action: 0, mods_state: 0x1001
+DEBUG: convert_input_key: action=0x0, mods_state=0x1001, keycode=0x23, repeat=0
+DEBUG: SC_MOD_LSHIFT on
+
+# 3 up
+DEBUG: VNC key event - key: 0x23, down: 0
+DEBUG: Current mods_state before: 0x1001
+DEBUG: Sending key event - keycode: 0x23, action: 1, mods_state: 0x1001
+DEBUG: convert_input_key: action=0x1, mods_state=0x1001, keycode=0x23, repeat=0
+DEBUG: SC_MOD_LSHIFT on
+
+# Lshift down
+DEBUG: VNC key event - key: 0xffe1, down: 0
+DEBUG: Current mods_state before: 0x1001
+DEBUG: Left Shift detected
+DEBUG: Sending key event - keycode: 0xffe1, action: 1, mods_state: 0x0
+DEBUG: convert_input_key: action=0x1, mods_state=0x0, keycode=0xffe1, repeat=
+
+# sharp in scrcpy
+# Lshift down
+#DEBUG: convert_input_key: action=0x0, mods_state=0x1001, keycode=0x400000e1, repeat=0
+DEBUG: SC_MOD_LSHIFT on
+# 3 down
+DEBUG: convert_input_key: action=0x0, mods_state=0x1001, keycode=0x33, repeat=0
+DEBUG: SC_MOD_LSHIFT on
+# Lshift up
+DEBUG: convert_input_key: action=0x1, mods_state=0x1000, keycode=0x400000e1, repeat=0
+# 3 up
+DEBUG: convert_input_key: action=0x1, mods_state=0x1000, keycode=0x33, repeat=0
+
+
+# ! vnc
+DEBUG: VNC key event - key: 0xffe1, down: 1
+DEBUG: Current mods_state before: 0x0
+DEBUG: Left Shift detected
+DEBUG: Sending key event - keycode: 0xffe1, action: 0, mods_state: 0x1001
+DEBUG: convert_input_key: action=0x0, mods_state=0x1001, keycode=0xffe1, repeat=0, inject_mode=2
+DEBUG: VNC key event - key: 0x21, down: 1
+DEBUG: Current mods_state before: 0x1001
+DEBUG: Sending key event - keycode: 0x21, action: 0, mods_state: 0x1001
+DEBUG: convert_input_key: action=0x0, mods_state=0x1001, keycode=0x21, repeat=0, inject_mode=2
+DEBUG: VNC key event - key: 0xffe1, down: 0
+DEBUG: Current mods_state before: 0x1001
+DEBUG: Left Shift detected
+DEBUG: Sending key event - keycode: 0xffe1, action: 1, mods_state: 0x0
+DEBUG: convert_input_key: action=0x1, mods_state=0x0, keycode=0xffe1, repeat=0, inject_mode=2
+DEBUG: VNC key event - key: 0x21, down: 0
+DEBUG: Current mods_state before: 0x0
+DEBUG: Sending key event - keycode: 0x21, action: 1, mods_state: 0x0
+DEBUG: convert_input_key: action=0x1, mods_state=0x0, keycode=0x21, repeat=0, inject_mode=2
+
+# ! scrcpy
+DEBUG: convert_input_key: action=0x0, mods_state=0x1001, keycode=0x400000e1, repeat=0, inject_mode=2
+DEBUG: SC_MOD_LSHIFT on
+DEBUG: convert_input_key: action=0x0, mods_state=0x1001, keycode=0x31, repeat=0, inject_mode=2
+DEBUG: SC_MOD_LSHIFT on
+DEBUG: convert_input_key: action=0x1, mods_state=0x1000, keycode=0x400000e1, repeat=0, inject_mode=2
+DEBUG: convert_input_key: action=0x1, mods_state=0x1000, keycode=0x31, repeat=0, inject_mode=2
+
+
+*/

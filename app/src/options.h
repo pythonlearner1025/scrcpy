@@ -124,6 +124,7 @@ struct scrcpy_options {
     uint16_t window_width;
     uint16_t window_height;
     uint32_t display_id;
+    uint16_t vnc_port;
     sc_tick display_buffer;
     sc_tick v4l2_buffer;
     sc_tick audio_buffer;

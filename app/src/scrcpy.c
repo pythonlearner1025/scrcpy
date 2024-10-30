@@ -413,6 +413,7 @@ scrcpy(struct scrcpy_options *options) {
 
     sdl_configure(options->display, options->disable_screensaver);
 
+
     // Await for server without blocking Ctrl+C handling
     bool connected;
     if (!await_for_server(&connected)) {
@@ -705,7 +706,7 @@ aoa_hid_end:
     }
 #ifdef HAVE_VNC
     if (options->vnc_server) {
-        if (!sc_vnc_sink_init(&s->vnc_sink, "my vnc server", controller, kp)) {
+        if (!sc_vnc_sink_init(&s->vnc_sink, "my vnc server", controller, kp, options->vnc_port)) {
             printf("bad vnc init \n");
             goto end;
         }

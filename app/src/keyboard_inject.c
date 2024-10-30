@@ -211,10 +211,11 @@ static enum android_metastate
 convert_meta_state(uint16_t mod) {
     enum android_metastate metastate = 0;
     if (mod & SC_MOD_LSHIFT) {
-        LOGD("sc->android works");
+        LOGD("SC_MOD_LSHIFT on");
         metastate |= AMETA_SHIFT_LEFT_ON;
     }
     if (mod & SC_MOD_RSHIFT) {
+        LOGD("SC_MOD_RSHIFT on");
         metastate |= AMETA_SHIFT_RIGHT_ON;
     }
     if (mod & SC_MOD_LCTRL) {
@@ -252,15 +253,13 @@ convert_input_key(const struct sc_key_event *event, struct sc_control_msg *msg,
     msg->type = SC_CONTROL_MSG_TYPE_INJECT_KEYCODE;
 
     // Add debug logging here
-    LOGD("convert_input_key: action=0x%x, mods_state=0x%x, keycode=0x%x, repeat=%" PRIu32,
-         event->action, event->mods_state, event->keycode, repeat);
+    LOGD("convert_input_key: action=0x%x, mods_state=0x%x, keycode=0x%x, repeat=%d, inject_mode=%" PRIu32,
+        event->action, event->mods_state, event->keycode, repeat, key_inject_mode);
 
     if (!convert_keycode(event->keycode, &msg->inject_keycode.keycode,
                          event->mods_state, key_inject_mode)) {
         return false;
     }
-
-    
 
     msg->inject_keycode.action = convert_keycode_action(event->action);
     msg->inject_keycode.repeat = repeat;

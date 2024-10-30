@@ -73,6 +73,7 @@ enum {
     OPT_AUDIO_BUFFER,
     OPT_AUDIO_OUTPUT_BUFFER,
     OPT_VNC_SERVER,
+    OPT_VNC_PORT
 };
 
 struct sc_option {
@@ -675,6 +676,12 @@ static const struct sc_option options[] = {
         .longopt = "vnc-server",
         .text = "Enable VNC server.",
     },
+    {
+        .longopt_id = OPT_VNC_PORT,
+        .longopt = "vnc-port",
+        .argdesc = "port", 
+        .optional_arg=true
+    }
 };
 
 static const struct sc_shortcut shortcuts[] = {
@@ -1864,6 +1871,11 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
             case OPT_AUDIO_OUTPUT_BUFFER:
                 if (!parse_audio_output_buffer(optarg,
                                                &opts->audio_output_buffer)) {
+                    return false;
+                }
+                break;
+            case OPT_VNC_PORT:
+                if (!parse_port(optarg, &opts->vnc_port)) {
                     return false;
                 }
                 break;
